@@ -175,7 +175,7 @@
 
     const audioFiles = Array.from({ length: TOTAL_QUESTIONS }, (_, i) => {
       const num = String(i + 1).padStart(3, "0");
-      return `audio/sample${num}.mp3`;
+      return `sample${num}.mp3.mp3`;
     });
 
     const questionsContainer = document.getElementById("questions");
