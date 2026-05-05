@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI 음성 분류 설문</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+      color: #222;
+    }
+
+    header {
+      background: #111827;
+      color: white;
+      text-align: center;
+      padding: 28px;
+    }
+
+    main {
+      max-width: 900px;
+      margin: 24px auto;
+      padding: 0 16px 40px;
+    }
+
+    .box, .question-card, .result {
+      background: white;
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+    }
+
+    .box {
+      border-left: 6px solid #2563eb;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 12px;
+      background: #e5e7eb;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: #2563eb;
+    }
+
+    .question-title {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 12px;
+    }
+
+    audio {
+      width: 100%;
+      margin: 10px 0;
+    }
+
+    .choices {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .choice {
+      flex: 1;
+      min-width: 180px;
+      border: 1px solid #d1d5db;
+      border-radius: 10px;
+      padding: 12px;
+      cursor: pointer;
+      background: #fafafa;
+    }
+
+    .choice:hover {
+      background: #eef2ff;
+      border-color: #2563eb;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 13px 18px;
+      font-size: 15px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-right: 8px;
+    }
+
+    .primary {
+      background: #2563eb;
+      color: white;
+    }
+
+    .secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    .danger {
+      background: #dc2626;
+      color: white;
+    }
+
+    .result {
+      display: none;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 180px;
+      margin-top: 12px;
+      padding: 12px;
+      font-family: Consolas, monospace;
+    }
+
+    .small {
+      font-size: 13px;
+      color: #555;
+    }
+
+    .error {
+      color: #dc2626;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>AI 음성 분류 설문</h1>
+    <p>각 음성을 듣고 AI 생성 음성인지, 인간 음성인지 판단해주세요.</p>
+  </header>
+
+  <main>
+    <section class="box">
+      <h3>안내</h3>
+      <p>
+        가능하면 이어폰 또는 헤드폰을 착용하고 조용한 환경에서 참여해주세요.<br>
+        각 음원은 0초부터 최대 60초까지만 재생됩니다.
+      </p>
+      <p class="small">※ index.html 파일과 audio 폴더는 같은 위치에 있어야 합니다.</p>
+    </section>
+
+    <section class="box">
+      <strong id="progressText">응답 완료: 0 / 100</strong>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </section>
+
+    <form id="surveyForm">
+      <div id="questions"></div>
+
+      <button type="button" class="primary" onclick="submitSurvey()">결과 생성</button>
+      <button type="button" class="secondary" onclick="downloadCSV()">CSV 다운로드</button>
+      <button type="button" class="danger" onclick="resetSurvey()">응답 초기화</button>
+    </form>
+
+    <section class="result" id="resultBox">
+      <h2>응답 결과</h2>
+      <p id="summary"></p>
+      <textarea id="resultText" readonly></textarea>
+    </section>
+  </main>
+
+  <script>
+    const TOTAL_QUESTIONS = 100;
+
+    const audioFiles = Array.from({ length: TOTAL_QUESTIONS }, (_, i) => {
+      const num = String(i + 1).padStart(3, "0");
+      return `audio/sample${num}.mp3`;
+    });
+
+    const questionsContainer = document.getElementById("questions");
+    const progressText = document.getElementById("progressText");
+    const progressFill = document.getElementById("progressFill");
+    const resultBox = document.getElementById("resultBox");
+    const resultText = document.getElementById("resultText");
+    const summary = document.getElementById("summary");
+
+    function createQuestions() {
+      questionsContainer.innerHTML = "";
+
+      audioFiles.forEach((file, index) => {
+        const qNum = index + 1;
+
+        const card = document.createElement("div");
+        card.className = "question-card";
+
+        card.innerHTML = `
+          <div class="question-title">${qNum}. 이 음성은 무엇이라고 생각하나요?</div>
+
+          <audio controls preload="metadata" data-qnum="${qNum}">
+            <source src="${file}" type="audio/mpeg">
+            브라우저가 오디오를 지원하지 않습니다.
+          </audio>
+
+          <div class="small" id="status${qNum}">파일: ${file}</div>
+
+          <div class="choices">
+            <label class="choice">
+              <input type="radio" name="q${qNum}" value="Human">
+              인간 음성
+            </label>
+
+            <label class="choice">
+              <input type="radio" name="q${qNum}" value="AI">
+              AI 생성 음성
+            </label>
+          </div>
+        `;
+
+        questionsContainer.appendChild(card);
+      });
+
+      document.querySelectorAll("input[type='radio']").forEach(input => {
+        input.addEventListener("change", updateProgress);
+      });
+
+      setupAudioLimit();
+    }
+
+    function setupAudioLimit() {
+      document.querySelectorAll("audio").forEach(audio => {
+        const qNum = audio.dataset.qnum;
+        const status = document.getElementById(`status${qNum}`);
+
+        audio.addEventListener("timeupdate", () => {
+          if (audio.currentTime >= 60) {
+            audio.pause();
+            audio.currentTime = 0;
+          }
+        });
+
+        audio.addEventListener("error", () => {
+          status.textContent = "음원 파일을 불러오지 못했습니다. 파일명/확장자/audio 폴더 위치를 확인하세요.";
+          status.className = "small error";
+        });
+      });
+    }
+
+    function getResponses() {
+      return audioFiles.map((file, index) => {
+        const qNum = index + 1;
+        const selected = document.querySelector(`input[name="q${qNum}"]:checked`);
+
+        return {
+          question: qNum,
+          audio_file: file,
+          response: selected ? selected.value : ""
+        };
+      });
+    }
+
+    function updateProgress() {
+      const responses = getResponses();
+      const completed = responses.filter(r => r.response !== "").length;
+      const percent = Math.round((completed / TOTAL_QUESTIONS) * 100);
+
+      progressText.textContent = `응답 완료: ${completed} / ${TOTAL_QUESTIONS}`;
+      progressFill.style.width = `${percent}%`;
+    }
+
+    function makeCSV(rows) {
+      const header = ["question", "audio_file", "response"];
+      const body = rows.map(row =>
+        header.map(key => `"${String(row[key]).replaceAll('"', '""')}"`).join(",")
+      );
+
+      return [header.join(","), ...body].join("\n");
+    }
+
+    function submitSurvey() {
+      const responses = getResponses();
+      const completed = responses.filter(r => r.response !== "").length;
+
+      if (completed < TOTAL_QUESTIONS) {
+        const ok = confirm(`아직 ${TOTAL_QUESTIONS - completed}문항이 비어 있습니다. 그래도 결과를 생성할까요?`);
+        if (!ok) return;
+      }
+
+      const csv = makeCSV(responses);
+      resultText.value = csv;
+      summary.textContent = `총 ${TOTAL_QUESTIONS}문항 중 ${completed}문항 응답 완료`;
+      resultBox.style.display = "block";
+      resultBox.scrollIntoView({ behavior: "smooth" });
+    }
+
+    function downloadCSV() {
+      const responses = getResponses();
+      const csv = makeCSV(responses);
+
+      const blob = new Blob(["\uFEFF" + csv], {
+        type: "text/csv;charset=utf-8;"
+      });
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = "audio_survey_responses.csv";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      URL.revokeObjectURL(url);
+    }
+
+    function resetSurvey() {
+      const ok = confirm("모든 응답을 초기화할까요?");
+      if (!ok) return;
+
+      document.querySelectorAll("input[type='radio']").forEach(input => {
+        input.checked = false;
+      });
+
+      resultBox.style.display = "none";
+      resultText.value = "";
+      updateProgress();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    createQuestions();
+    updateProgress();
+  </script>
+</body>
+</html>
